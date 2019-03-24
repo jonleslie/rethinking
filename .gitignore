@@ -1,0 +1,19 @@
+# RStudio files
+.Rproj.user
+
+# History files
+.Rhistory
+
+# Session Data files
+.RData
+
+# Ignore data files
+data/raw/*
+data/interim/*
+data/processed/*
+
+# exceptions to the rule
+!data/raw/.gitkeep
+!data/interim/.gitkeep
+!data/processed/.gitkeep
+
