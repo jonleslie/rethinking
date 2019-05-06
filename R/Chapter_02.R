@@ -266,7 +266,7 @@ p_twins_B = 0.2 # P(Twins|Species = B)
 # P(A|twins) = P(twins|A)P(A)/P(twins)
 # P(B|twins) = P(twins|B)P(B)/P(twins)
 # P(twins) = P(twins|A)P(A) + P(twins|B)P(B)
-p_twins = 0.1 * 0.5 + 0.2 * 0.5
+p_twins = 0.1 * 0.5 + 0.2 * 0.5 # Average probability of twins
 
 p_A_twins = (0.1 * 0.5)/p_twins
 p_B_twins = (0.2 * 0.5)/p_twins
@@ -283,7 +283,7 @@ p_twins_twins
 species.1.likelihood <- .1
 species.2.likelihood <- .2
 likelihood <- c(species.1.likelihood, species.2.likelihood)
-prior <- c(0.5, 0.5) # was written c(1, 1) on the webpage
+prior <- c(1, 1) # was written c(1, 1) on the webpage
 unstandardized.posterior <- likelihood * prior
 posterior <- unstandardized.posterior / sum(unstandardized.posterior)
 
@@ -307,7 +307,7 @@ p_A_twins
 species.1.likelihood <- .1
 species.2.likelihood <- .2
 likelihood <- c(species.1.likelihood, species.2.likelihood)
-prior <- c(0.5, 0.5)
+prior <- c(1,1)
 unstandardized.posterior <- likelihood * prior
 posterior <- unstandardized.posterior / sum(unstandardized.posterior)
 
