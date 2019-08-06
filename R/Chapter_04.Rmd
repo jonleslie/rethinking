@@ -1,6 +1,8 @@
 ---
 title: "Chapter_04"
-output: html_notebook
+output:
+  html_document:
+    df_print: paged
 ---
 
 ```{r, message=FALSE}
@@ -60,7 +62,7 @@ str(d)
 ```
 
 ```{r}
-d$height
+# d$height
 d2 <- d[d$age >= 18,]
 dens(d2$height)
 curve(dnorm(x, 178, 20), from = 100, to = 250)
@@ -92,6 +94,7 @@ post$prod <- post$LL + dnorm( post$mu , 178 , 20 , TRUE ) +
 post$prob <- exp( post$prod - max(post$prod) )
 
 ```
+
 
 ```{r}
 # 4.15
@@ -199,6 +202,582 @@ precis(post)
 ```
 
 ```{r}
-plot(post)
+plot(post, cex = 0.5, pch = 16, col = col.alpha(rangi2, 0.5))
+```
+
+# 4.4 Addig a predictor
+
+```{r}
+plot(d2$height ~ d2$weight)
+```
+
+### 4.4.1 The linear model strategy
+### 4.4.2 Fitting the model
+```{r 4.38}
+# load data again since it's a long way back
+library(rethinking)
+data("Howell1")
+d <- Howell1
+d2 <- d[d$age >= 18,]
+
+# fit model
+m4.3 <- map(
+  alist(
+    height ~ dnorm(mu, sigma),
+    mu <- a + b*weight,
+    a ~ dnorm(156, 100),
+    b ~ dnorm(0, 10),
+    sigma ~ dunif(0, 50)
+  ), 
+  data = d2
+)
+
+```
+
+### 4.4.3 Interpreting the model fit
+
+```{r 4.40}
+precis(m4.3)
+```
+
+```{r 4.41}
+precis(m4.3, corr = TRUE)
+```
+
+```{r 4.42}
+d2$weight.c <- d2$weight - mean(d2$weight)
+```
+
+```{r 4.43}
+m4.4 <- map(
+  alist(
+    height ~ dnorm(mu, sigma),
+    mu <- a + b*weight.c,
+    a ~ dnorm(178, 100),
+    b ~ dnorm(0, 10),
+    sigma ~ dunif(0, 50)
+  ),
+  data = d2
+)
+
+precis(m4.4, corr = TRUE)
+```
+
+```{r 4.45}
+plot(height ~ weight, data = d2)
+abline(a = coef(m4.3)["a"], b = coef(m4.3)["b"])
+```
+
+
+```{r 4.46}
+post <- extract.samples(m4.3)
+post[1:5,]
+```
+
+```{r 4.48}
+N <- 10
+dN <- d2[1:N, ]
+mN <- map(
+  alist(
+    height ~ dnorm(mu, sigma),
+    mu <- a + b*weight,
+    a ~ dnorm(178, 100),
+    b ~ dnorm(0, 50),
+    sigma ~ dunif(0, 50)
+  ), data = dN
+)
+```
+
+```{r 4.49}
+# extract 20 samples from the posterio
+post <- extract.samples(mN, n = 20)
+
+# display raw data and sample size
+plot(dN$weight, dN$height,
+     xlim = range(d2$weight), ylim = range(d2$height),
+     col = rangi2, xlab="weight", ylab="height")
+mtext(concat("N = ", N))
+
+# plot the lines with transparency
+for (i in 1:20) abline(a = post$a[i], b = post$b[i], col=col.alpha("black", 0.3))
+
+```
+
+```{r 4.50}
+mu_at_50 <- post$a + post$b * 50 
+dens(mu_at_50, col = rangi2, lwd = 2, xlab = "mu|weight = 50")
+```
+
+```{r 4.52}
+HPDI(mu_at_50, prob = 0.89)
+```
+
+```{r 4.53}
+mu <- link(m4.3)
+str(mu)
+```
+
+
+```{r 4.54}
+# define sequence of weights to compute predictions for
+# these values will be on the horizontal axis
+weight.seq <- seq( from=25 , to=70 , by=1 )
+
+# use link to compute mu
+# for each sample from posterior
+# and for each weight in weight.seq
+mu <- link( m4.3 , data=data.frame(weight=weight.seq) )
+str(mu)
+```
+
+```{r 4.55}
+# use type="n" to hide raw data
+plot(height ~ weight, d2, type = "n")
+
+# loop over samples and plot each mu value
+for(i in 1:100){
+  points(weight.seq, mu[i,], pch = 16, col = col.alpha(rangi2, 0.1))
+}
+```
+
+```{r 4.56}
+mu.mean <- apply(mu, 2, mean)
+mu.HPDI <- apply(mu, 2, HPDI, prob = 0.89)
+```
+
+```{r 4.57}
+# plot raw data
+# fading out points to make line and interval more visible
+plot(height ~ weight, data = d2, col=col.alpha(rangi2, 0.5))
+
+# plot the MAP line, aka the mean mu for each weight
+lines(weight.seq, mu.mean)
+
+# plot a shaded region for the 89% HPDI
+shade(mu.HPDI, weight.seq)
+```
+
+```{r 4.59}
+sim.height <- sim(m4.3, data = list(weight = weight.seq))
+str(sim.height)
+```
+
+```{r 4.60}
+height.PI <- apply(sim.height, 2, PI, prob=0.89)
+
+# plot raw data
+plot( height ~ weight , d2 , col=col.alpha(rangi2,0.5) )
+
+# draw MAP line
+lines( weight.seq , mu.mean )
+
+# draw HPDI region for line
+shade( mu.HPDI , weight.seq )
+
+# draw PI region for simulated heights
+shade( height.PI , weight.seq )
+
+```
+
+# 4.5 Polynomial regression
+
+```{r 4.64}
+library(rethinking)
+data("Howell1")
+d <- Howell1
+str(d)
+
+plot(d$weight, d$height)
+
+```
+
+```{r 4.65}
+d$weight.s <- (d$weight - mean(d$weight))/sd(d$weight)
+plot(d$weight.s, d$height)
+```
+
+```{r 4.66}
+d$weight.s2 <- d$weight.s^2
+m4.5 <- map(
+    alist(
+        height ~ dnorm( mu , sigma ) ,
+        mu <- a + b1*weight.s + b2*weight.s2 ,
+        a ~ dnorm( 178 , 100 ) ,
+        b1 ~ dnorm( 0 , 10 ) ,
+        b2 ~ dnorm( 0 , 10 ) ,
+        sigma ~ dunif( 0 , 50 )
+    ) ,
+    data=d )
+```
+
+```{r 4.67}
+precis(m4.5)
+```
+
+```{r 4.68}
+weight.seq <- seq(from = -2.2, to = 2, length.out = 30)
+pred_dat <- list(weight.s = weight.seq, weight.s2 = weight.seq ^ 2)
+mu <- link(m4.5, data = pred_dat)
+mu.mean <- apply(mu, 2, mean)
+mu.PI <- apply(mu, 2, PI, prob = 0.89)
+sim.height <- sim(m4.5, data = pred_dat)
+height.PI <- apply(sim.height, 2, PI, prob = 0.89)
+
+plot(height ~ weight.s, d, col = col.alpha(rangi2, 0.5))
+lines(weight.seq, mu.mean)
+shade(mu.PI, weight.seq)
+shade(height.PI, weight.seq)
+```
+
+```{r 4.70}
+d$weight.s3 <- d$weight.s^3
+m4.6 <- map(
+    alist(
+        height ~ dnorm( mu , sigma ) ,
+        mu <- a + b1*weight.s + b2*weight.s2 + b3*weight.s3 ,
+        a ~ dnorm( 178 , 100 ) ,
+        b1 ~ dnorm( 0 , 10 ) ,
+        b2 ~ dnorm( 0 , 10 ) ,
+        b3 ~ dnorm( 0 , 10 ) ,
+        sigma ~ dunif( 0 , 50 )
+    ) ,
+    data=d )
+```
+
+```{r}
+weight.seq <- seq(from = -2.2, to = 2, length.out = 30)
+pred_dat <- list(weight.s = weight.seq, 
+                 weight.s2 = weight.seq^2,
+                 weight.s3 = weight.seq^3)
+mu <- link(m4.6, data = pred_dat)
+mu.mean <- apply(mu, 2, mean)
+mu.PI <- apply(mu, 2, PI, prob = 0.89)
+sim.height <- sim(m4.6, data = pred_dat)
+height.PI <- apply(sim.height, 2, PI, prob = 0.89)
+
+plot(height ~ weight.s, d, col = col.alpha(rangi2, 0.5))
+lines(weight.seq, mu.mean)
+shade(mu.PI, weight.seq)
+shade(height.PI, weight.seq)
+```
+
+```{r 4.71}
+plot(height ~ weight.s, d, col = col.alpha(rangi2, 0.5), xaxt = "n")
+at <- c(-2, -1, 0, 1, 2)
+labels <- at*sd(d$weight) + mean(d$weight)
+axis(side = 1, at = at, labels = round(labels, 1))
+
+```
+
+
+# 4.7 Practice
+## Easy
+### 4E1
+The first line
+
+### 4E2
+Two
+
+### 4E3
+p(mu, sigma | y = Pi Normal(hi|mu, sigma)Normal(mu | 0, 10) Uniform( sigma | 0, 10))/...
+
+### 4E4
+The second line
+
+### 4E5
+Three: a, b, s
+
+## Medium
+### 4M1
+
+```{r}
+sample.mu <- rnorm(1e4, 0, 10)
+sample.sigma <- runif(1e4, 0, 10)
+sample.y <- rnorm(1e4, sample.mu, sample.sigma)
+
+dens(sample.y)
+```
+
+### 4M2
+```{r}
+flist <- alist(
+  height ~ dnorm(mu, sigma),
+  mu ~ dnorm(0, 10),
+  sigma ~ dunif(0, 10)
+)
+
+```
+
+### 4M3
+```{r}
+flist <- alist(
+  y ~ dnorm(mu, sigma),
+  mu <- a + b * x,
+  a ~ dnorm(0, 50),
+  b ~ dnorm(0, 10),
+  sigma ~ dunif(0, 50)
+)
+```
+
+\begin{align}
+y_{i} &\sim \text{Normal}(\mu, \sigma) \\
+\mu_{i} &= \alpha + \beta x_{i} \\
+\alpha &\sim \text{Normal}(0, 50) \\
+\beta &\sim \text{Uniform}(0, 10) \\
+\sigma &\sim \text{Uniform}(0, 50)
+\end{align}
+
+___
+### 4M4
+
+\begin{align}
+h_{i} &\sim \text{Normal}(\mu, \sigma) \\
+\mu &= \alpha + \beta x_{i} \\
+\alpha &\sim \text{Normal}(150, 50) \\
+\beta &\sim \text{Normal}(4, 2) \\
+\sigma &\sim \text{Uniform}(0, 50)
+\end{align}
+
+___
+### 4M5
+
+\begin{align}
+h_{i} &\sim \text{Normal}(\mu, \sigma) \\
+\mu &= \alpha + \beta x_{i} \\
+\alpha &\sim \text{Normal}(120, 10) \\
+\beta &\sim \text{Normal}(7, 1) \\
+\sigma &\sim \text{Uniform}(0, 20)
+\end{align}
+
+___
+### 4M6
+
+\begin{align}
+h_{i} &\sim \text{Normal}(\mu, \sigma) \\
+\mu &= \alpha + \beta x_{i} \\
+\alpha &\sim \text{Normal}(120, 10) \\
+\beta &\sim \text{Normal}(7, 1) \\
+\sigma &\sim \text{Uniform}(0, 8)
+\end{align}
+
+## Hard
+### 4H1
+
+Build the MAP model:
+```{r}
+library(rethinking)
+data("Howell1")
+
+d <- Howell1
+m4H1 <- map(
+  alist(
+    height ~ dnorm(mu, sigma),
+    mu <- a + b * weight,
+    a ~ dnorm(140, 30),
+    b ~ dnorm(0, 10),
+    sigma ~ dunif(0, 50)
+  ),
+  data = d
+)
+
+m4H1
+```
+
+Now calculate the posterior distribution of heights for each weight value in our table:
+```{r}
+new_weight <- c(46.95, 43.72, 64.78, 32.59, 54.63)
+pred_height <- link(m4H1, data = data.frame(weight = new_weight))
+str(pred_height)
+```
+
+Plot the distributions of pred_height for each weight.
+```{r}
+plot(height ~ weight, d, type = "n")
+
+for (i in 1:100) {
+  points(new_weight, pred_height[i,], pch = 16, col = col.alpha(rangi2, 0.5))
+}
+```
+
+Calculate the mean and HPDI for the predictions:
+```{r}
+(pred_mean <- apply(pred_height, 2, mean))
+(pred_interval <- apply(pred_height, 2, HPDI))
+
+```
+
+Put it into a data frame:
+```{r}
+df <- data.frame(
+  individual = 1:5,
+  weight = new_weight,
+  pred_height = pred_mean,
+  lower = pred_interval[1,],
+  upper = pred_interval[2,]
+)
+
+df
+```
+
+
+### 4H2
+```{r}
+d <- Howell1
+df <- d[d$age < 18,]
+range(df$height)
+summary(df$height)
+dens(df$height)
+HPDI(df$height)
+sd(df$height)
+```
+
+#### (a)
+```{r}
+m4H2 <- map(
+  alist(
+    height ~ dnorm(mu, sigma),
+    mu <- a + b * weight,
+    a ~ dnorm(110, 30),
+    b ~ dnorm(0, 10),
+    sigma ~ dunif(0, 50)
+  ),
+  data = df
+)
+
+precis(m4H2, corr = TRUE)
+```
+
+For every 10 units increase in weight, the model predicts a 27 unit increase in height. The model also estimates that the standard deviation for under-18s is 8.44.
+
+```{r}
+fit <- lm(height ~ weight, data = df)
+summary(fit)
+```
+
+#### (b)
+```{r}
+# Determine the range of weights
+range(df$weight)
+
+# Define sequence of weight to predict on
+weight.seq <- seq(4, 46, by = 2)
+
+# compute mu for each sample from the posterior and for each weight we want to predict on
+mu <- link(m4H2, data = data.frame(weight = weight.seq))
+str(mu)
+```
+
+Summarise the distribution of mu
+```{r}
+mu.mean <- apply(mu, 2, mean)
+mu.HPDI <- apply(mu, 2, HPDI, prob = 0.89)
+```
+
+Calculate the prediction interval
+```{r}
+sim.height <- sim(m4H2, data = list(weight = weight.seq))
+height.PI <- apply(sim.height, 2, PI)
+```
+
+
+```{r}
+# Plot raw data
+plot(height ~ weight, df, col = col.alpha(rangi2, 0.5))
+
+# Add map line
+lines(weight.seq, mu.mean)
+
+# Add HPDI interval for the line
+shade(mu.HPDI, weight.seq)
+
+# Add PI interval for the simulated heights
+shade(height.PI, weight.seq)
+
+```
+
+#### (c)
+I'm concerned that:
+
+- The relationship between height and weight does not appear to be linear in the raw data
+
+### 4H3
+#### (a)
+Start with model definition:
+
+\begin{align}
+h_{i} &\sim \text{Normal}(\mu_{i}, \sigma) \\
+\mu_{i} &= \alpha + \beta \text{log}(w_{i}) \\
+\alpha &\sim \text{Normal}(178, 100) \\
+\beta &\sim \text{Normal}(0, 100) \\
+\sigma &\sim \text{Uniform}(0, 50)
+\end{align}
+
+```{r}
+d <- Howell1
+
+m4H3 <- map(
+  alist(
+    height ~ dnorm(mu, sigma),
+    mu <- a + b * log(weight),
+    a ~ dnorm(178, 100),
+    b ~ dnorm(0, 100),
+    sigma ~ dunif(0, 50)
+  ),
+  data = d
+)
+
+precis(m4H3, corr = TRUE)
+
+```
+
+Interpretation:
+
+- the value of _a_ is -24 cm, meaning that a person with log(0) weight in kg will be -24 cm tall. This is silly, of course. For one reason, log(0) is -Inf!
+- the value of _b_ is 47 cm/log(kg), meaning that for every increase of one log unit of weight, the height increases by 47 cm. 
+- the estimate of $\sigma$ means that, in the model, the estimate of standard deviation of height is 5.1 cm.
+
+#### (b)
+```{r}
+plot(height ~ weight, data = Howell1, col = col.alpha(rangi2, 0.4))
+```
+
+```{r}
+# Estimate the MAP regression line and 89% HPDI for the mean
+weight.seq <- seq(
+  from = min(d$weight),
+  to = max(d$weight),
+  by = 2
+)
+
+mu <- link(m4H3, data = data.frame(weight = weight.seq))
+str(mu)
+```
+
+Summarise the distribution of $\mu$
+```{r}
+mu.mean <- apply(mu, 2, mean)
+mu.HPDI <- apply(mu, 2, HPDI)
+```
+
+Calculate the prediction interval
+```{r}
+sim.height <- sim(m4H3, data = list(weight = weight.seq))
+
+height.PI <- apply(sim.height, 2, PI)
+```
+
+Plot it
+```{r}
+# Plot original data
+plot(height ~ weight, data = Howell1, col = col.alpha(rangi2, 0.4))
+
+# Add regression line for mu
+lines(weight.seq, mu.mean)
+
+# Add HPDI interval for the line
+shade(mu.HPDI, weight.seq)
+
+# Add PI interval for the predicted heights
+shade(height.PI, weight.seq)
 ```
 
