@@ -242,7 +242,7 @@ d <- milk
 str(d)
 ```
 
-```{r 5.17}
+```{r 5.17, eval=FALSE}
 m5.5 <- map(
     alist(
         kcal.per.g ~ dnorm( mu , sigma ) ,
@@ -505,3 +505,232 @@ pairs(~ kcal.per.g + perc.fat + perc.lactose,
 cor(d$perc.fat, d$perc.lactose)
 ```
 
+## 5.3.3 Post-treatment bias
+```{r 5.41}
+# number of plants
+N <- 100
+
+# simulate initial heights
+h0 <- rnorm(N,10,2)
+
+# assign treatments and simulate fungus and growth
+treatment <- rep( 0:1 , each=N/2 )
+fungus <- rbinom( N , size=1 , prob=0.5 - treatment*0.4 )
+h1 <- h0 + rnorm(N, 5 - 3*fungus)
+
+# compose a clean data frame
+d <- data.frame( h0=h0 , h1=h1 , treatment=treatment , fungus=fungus )
+d
+```
+
+```{r 5.42}
+m5.13 <- map(
+    alist(
+        h1 ~ dnorm(mu,sigma),
+        mu <- a + bh*h0 + bt*treatment + bf*fungus,
+        a ~ dnorm(0,100),
+        c(bh,bt,bf) ~ dnorm(0,10),
+        sigma ~ dunif(0,10)
+    ),
+    data=d )
+precis(m5.13)
+```
+
+```{r 5.43}
+m5.14 <- map(
+    alist(
+        h1 ~ dnorm(mu,sigma),
+        mu <- a + bh*h0 + bt*treatment,
+        a ~ dnorm(0,100),
+        c(bh,bt) ~ dnorm(0,10),
+        sigma ~ dunif(0,10)
+    ),
+    data=d )
+precis(m5.14)
+```
+
+# 5.4 Cateorical variables
+## 5.4.1 Binary categories
+
+```{r 5.44}
+data("Howell1")
+d <- Howell1
+str(d)
+```
+
+```{r 5.45}
+m5.15 <- map(
+  alist(
+    height ~ dnorm(mu, sigma),
+    mu <- a + bm*male,
+    a ~ dnorm(178, 100),
+    bm ~ dnorm(0, 10),
+    sigma ~ dunif(0, 50)
+  ),
+  data = d
+)
+precis(m5.15)
+```
+
+```{r 5.46}
+post <- extract.samples(m5.15)
+mu.male <- post$a + post$bm
+PI(mu.male)
+```
+
+## 5.4.2 Many categories
+
+```{r 5.48}
+data(milk)
+d <- milk
+unique(d$clade)
+```
+
+```{r 5.49}
+(d$clade.NWM <- ifelse(d$clade == "New World Monkey", 1, 0))
+```
+
+```{r 5.50}
+d$clade.OWM <- ifelse(d$clade == "Old World Monkey", 1, 0)
+d$clade.S <- ifelse(d$clade == "Strepsirrhine", 1, 0)
+```
+
+```{r 5.51}
+m5.16 <- map(
+    alist(
+        kcal.per.g ~ dnorm( mu , sigma ) ,
+        mu <- a + b.NWM*clade.NWM + b.OWM*clade.OWM + b.S*clade.S ,
+        a ~ dnorm( 0.6 , 10 ) ,
+        b.NWM ~ dnorm( 0 , 1 ) ,
+        b.OWM ~ dnorm( 0 , 1 ) ,
+        b.S ~ dnorm( 0 , 1 ) ,
+        sigma ~ dunif( 0 , 10 )
+    ) ,
+    data=d )
+precis(m5.16)
+
+```
+
+```{r 5.52}
+# sample posterior
+post <- extract.samples(m5.16)
+
+# compute averages for each category
+mu.ape <- post$a
+mu.NWM <- post$a + post$b.NWM
+mu.OWM <- post$a + post$b.OWM
+mu.S <- post$a + post$b.S
+
+# summarize using precis
+precis( data.frame(mu.ape,mu.NWM,mu.OWM,mu.S) )
+```
+
+## 5.4.3 Adding regular predictor variables
+## 5.4.4 Another approach: Unique intercepts
+
+```{r 5.54}
+(d$clade_ID <-  coerce_index(d$clade))
+```
+
+```{r 5.55}
+# m5.16_alt <- map(
+#     alist(
+#         kcal.per.g ~ dnorm( mu , sigma ) ,
+#         mu <- a[clade_id] ,
+#         a[clade_id] ~ dnorm( 0.6 , 10 ) ,
+#         sigma ~ dunif( 0 , 10 )
+#     ) ,
+#     data=d )
+# precis( m5.16_alt , depth=2 )
+```
+
+# 5.7 Practice
+Answers [here](https://rpubs.com/jmgirard/sr5)
+
+## Easy
+### 5E1
+2, 3, 4
+
+### 5E2
+\begin{align}
+\mu &= \alpha + \beta_{A}A_{i} + \beta_{P}P_{i} \\
+\end{align}
+
+### 5E3
+\begin{align}
+\mu &= \alpha + \beta_{F}F_{i} + \beta_{S}S_{i}
+\end{align}
+
+Where $F$ is amount of funding and $S$ is the size of laboratory.
+
+Both slope parameters should be positive.
+
+### 5E4
+1, 3, 4 and 5. Easy question?
+
+## Medium
+### 5M1
+Adapt from page 135
+
+### 5M2
+Adapt from page 141
+
+### 5M3
+We might hypothesize that a high divorce rate causes a higher marriage rate by introducing more unmarried individuals (who have a demonstrated willingness to marry) into the dating pool. This possibility could be evaluated using multiple regression by regressing marriage rate on both divorce rate and re-marriage rate (i.e., the rate of non-first marriages or marriages following divorces). If divorce rate no longer predicts marriage rate even when the re-marriage rate is known, this would support our hypothesis.
+
+### 5M4
+```{r}
+library(tidyverse)
+d <- WaffleDivorce
+
+lds_df <- readr::read_csv("../data/raw/LDS_wiki.csv") %>% 
+  select(State, LDS)
+lds_df
+
+d <- d %>% 
+  dplyr::left_join(lds_df, by = c("Location" = "State"))
+
+hist(d$LDS)
+hist(log(d$LDS))
+
+d <- d %>% 
+  mutate(logLDS = log(LDS)) %>% 
+  mutate(logLDS.s = (logLDS - mean(logLDS))/sd(logLDS))
+
+hist(d$logLDS, breaks = 9)
+hist(d$logLDS.s, breaks = 9)
+simplehist(d$logLDS)
+simplehist(d$logLDS.s)
+```
+
+Now make a new model:
+
+```{r}
+library(rethinking)
+detach("package:purrr")
+names(d)
+m5M4 <- map(
+  alist(
+    Divorce ~ dnorm(mu, sigma),
+    mu <- a + bR*Marriage + bA*MedianAgeMarriage + bL*logLDS.s,
+    a ~ dnorm( 10 , 20 ) ,
+    bR ~ dnorm( 0 , 10 ) ,
+    bA ~ dnorm( 0 , 10 ) ,
+    bL ~ dnorm(0, 10),
+    sigma ~ dunif( 0 , 10 )
+  ),
+  data = d
+)
+precis(m5M4)
+```
+
+### 5M5
+From jmgirard:
+To address these two mechanisms, we need variables that would capture them. For the first mechanism, a variable corresponding to time spent exercising would be a reasonable start. For the second mechanism, a variable corresponding to frequency of eating out at restaurant would be a reasonable start. We could get even fancier and try to measure things like calories burned during exercise and calories ingested at restaurants. However, we would want to be careful not to introduce multicollinearity by adding highly correlated variables. So, I would propose the following multiple regression model:
+
+
+\begin{align}
+\mu_{i} = \alpha + \beta_{G}{G_i} + \beta_{E}E_{i} + \beta_{R}R_{i}
+\end{align}
+
+where G represents the price of gasoline, E represents one exercise-related variable, and R represents one restaurant-related variable. One version of this model might use self-reported frequencies of exercise and eating out, and another version might use more rigorously measured calories burned through exercise and calories ingested from restaurants.
