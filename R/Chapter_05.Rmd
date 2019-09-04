@@ -830,12 +830,12 @@ pred.data <- data.frame(
   groupsize = G.avg
 )
 
-# compute counterfactual mean divorce
+# compute counterfactual mean area
 mu <- link(mag, data = pred.data)
 mu.mean <- apply(mu, 2, mean)
 mu.PI <- apply(mu, 2, PI)
 
-# simulat counterfactual divorce outcomes
+# simulat counterfactual area outcomes
 A.sim <- sim(mag, data = pred.data, n = 1e4)
 A.PI <- apply(A.sim, 2, PI)
 
@@ -846,5 +846,75 @@ mtext("groupsize = 4.345")
 lines(A.seq, mu.mean)
 shade(mu.PI, A.seq)
 shade(A.PI, A.seq)
+```
+
+```{r}
+# counterfacutal plot for group size
+G.seq <- seq(from = 1, to = 9, length.out = 30)
+A.avg <- mean(d$area)
+pred.data <- data.frame(
+  area = A.avg,
+  groupsize = G.seq
+)
+
+# compute counterfactual mean groupsize
+mu <- link(mag, data = pred.data)
+```
+
+```{r}
+mu.mean <- apply(mu, 2, mean)
+mu.PI <- apply(mu, 2, PI)
+
+# simulate counterfactual groupsize outcomes
+G.sim <- sim(mag, data = pred.data, n = 1e4)
+
+```
+
+```{r}
+G.PI <- apply(G.sim, 2, PI)
+
+# display predictions, hiding raw data with type="n"
+plot(weight ~ groupsize, data = d, type="n")
+mtext("area = 3.17")
+
+lines(G.seq, mu.mean)
+shade(mu.PI, G.seq)
+shade(G.PI, G.seq)
+
+```
+
+### 5H3
+```{r}
+m5h3_2 <- map(
+  alist(
+    weight ~ dnorm(mu, sigma),
+    mu <- a + bf * avgfood + bg * groupsize,
+    a ~ dnorm(5, 5),
+    bf ~ dnorm(0, 5),
+    bg ~ dnorm(0, 5),
+    sigma ~ dunif(0, 5)
+  ),
+  data = d
+)
+
+precis(m5h3_2)
+
+```
+
+```{r}
+m5h3_3 <- map(
+  alist(
+    weight ~ dnorm(mu, sigma),
+    mu <- a + bf * avgfood + bg * groupsize + ba * area,
+    a ~ dnorm(5, 5),
+    bf ~ dnorm(0, 5),
+    bg ~ dnorm(0, 5),
+    ba ~ dnorm(0, 5),
+    sigma ~ dunif(0, 5)
+  ),
+  data = d
+)
+
+precis(m5h3_3)
 ```
 
