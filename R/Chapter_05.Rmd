@@ -733,4 +733,118 @@ To address these two mechanisms, we need variables that would capture them. For 
 \mu_{i} = \alpha + \beta_{G}{G_i} + \beta_{E}E_{i} + \beta_{R}R_{i}
 \end{align}
 
-where G represents the price of gasoline, E represents one exercise-related variable, and R represents one restaurant-related variable. One version of this model might use self-reported frequencies of exercise and eating out, and another version might use more rigorously measured calories burned through exercise and calories ingested from restaurants.
+where $G$ represents the price of gasoline, $E$ represents one exercise-related variable, and $R$ represents one restaurant-related variable. One version of this model might use self-reported frequencies of exercise and eating out, and another version might use more rigorously measured calories burned through exercise and calories ingested from restaurants.
+
+## Hard
+```{r}
+d <- read.table(
+  "https://raw.githubusercontent.com/rmcelreath/rethinking/master/data/foxes.csv",
+  header = TRUE,
+  sep = ";")
+d
+summary(d)
+```
+
+### 5H1
+```{r}
+ma <- map(
+  alist(
+    weight ~ dnorm(mu, sigma),
+    mu  <-a + bA * area,
+    a ~ dnorm(5, 5),
+    bA ~ dnorm(0, 5),
+    sigma ~ dunif(0, 5)
+  ),
+  data = d
+)
+
+mg <- map(
+  alist(
+    weight ~ dnorm(mu, sigma),
+    mu <- a + bG * groupsize,
+    a ~ dnorm(5, 5),
+    bG ~ dnorm(0, 5),
+    sigma ~ dunif(0, 5)
+  ),
+  data = d
+)
+
+precis(ma)
+precis(mg)
+```
+
+```{r}
+area.seq <- seq(from = min(d$area), 
+                to = max(d$area),
+                length.out = 30)
+mu <- link(ma, data = data.frame(area = area.seq))
+```
+
+```{r}
+mu.PI <- apply(mu, 2, PI)
+
+# plot it:
+plot(weight ~ area, data = d, col = rangi2)
+abline(ma)
+shade(mu.PI, area.seq)
+```
+
+```{r}
+gs.seq <- seq(from = min(d$groupsize),
+              to = max(d$groupsize),
+              length.out = 30)
+mu <- link(mg, data = data.frame(groupsize = gs.seq))
+
+mu.PI <- apply(mu, 2, PI)
+
+# plot it
+plot(weight ~ groupsize, data = d, col = rangi2)
+abline(mg)
+shade(mu.PI, gs.seq)
+```
+
+### 5H2
+```{r}
+mag <- map(
+  alist(
+    weight ~ dnorm(mu, sigma),
+    mu <- a + ba * area + bg * groupsize,
+    a ~ dnorm(5, 5),
+    ba ~ dnorm(0, 5),
+    bg ~ dnorm(0, 5),
+    sigma ~ dunif(0, 5)
+  ),
+  data = d
+)
+
+precis(mag)
+plot(precis(mag))
+```
+
+```{r}
+# counterfactual plot for territory area
+G.avg <- mean(d$groupsize)
+A.seq <- seq(from = 0, to = 6, length.out = 30)
+pred.data <- data.frame(
+  area = A.seq,
+  groupsize = G.avg
+)
+
+# compute counterfactual mean divorce
+mu <- link(mag, data = pred.data)
+mu.mean <- apply(mu, 2, mean)
+mu.PI <- apply(mu, 2, PI)
+
+# simulat counterfactual divorce outcomes
+A.sim <- sim(mag, data = pred.data, n = 1e4)
+A.PI <- apply(A.sim, 2, PI)
+
+# display redictions, hiding raw data with type = "n"
+plot(weight ~ area, data = d, type = "n")
+mtext("groupsize = 4.345")
+
+lines(A.seq, mu.mean)
+shade(mu.PI, A.seq)
+shade(A.PI, A.seq)
+```
+
