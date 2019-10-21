@@ -407,17 +407,17 @@ d <- data.frame(height,leg_left,leg_right)
 ```
 
 ```{r 5.30}
-m5.8 <- map(
-    alist(
-        height ~ dnorm( mu , sigma ) ,
-        mu <- a + bl*leg_left + br*leg_right ,
-        a ~ dnorm( 10 , 100 ) ,
-        bl ~ dnorm( 2 , 10 ) ,
-        br ~ dnorm( 2 , 10 ) ,
-        sigma ~ dunif( 0 , 10 )
-    ) ,
-    data=d )
-precis(m5.8)
+# m5.8 <- map(
+#     alist(
+#         height ~ dnorm( mu , sigma ) ,
+#         mu <- a + bl*leg_left + br*leg_right ,
+#         a ~ dnorm( 10 , 100 ) ,
+#         bl ~ dnorm( 2 , 10 ) ,
+#         br ~ dnorm( 2 , 10 ) ,
+#         sigma ~ dunif( 0 , 10 )
+#     ) ,
+#     data=d )
+# precis(m5.8)
 ```
 
 ```{r}
