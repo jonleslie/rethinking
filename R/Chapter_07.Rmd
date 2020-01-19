@@ -1,0 +1,75 @@
+---
+title: "Chapter 7"
+output: html_notebook
+---
+
+# 7.1 Building an interaction
+
+```{r 7.1 }
+library(rethinking)
+data("rugged")
+d <- rugged
+
+# make a log version of the outcome
+d$log_gdp <- log(d$rgdppc_2000)
+
+# extract countries with GDP data
+dd <- d[complete.cases(d$rgdppc_2000), ]
+
+# split countries into Africa and not-AFrica
+d.A1 <- dd[dd$cont_africa == 1, ] # Africa
+d.A0 <- dd[dd$cont_africa == 0, ] # not Africa
+```
+
+
+```{r 7,2}
+# African nations
+m7.1 <- map(
+  alist(
+    log_gdp ~ dnorm(mu, sigma),
+    mu <- a + bR * rugged,
+    a ~ dnorm(8, 100),
+    bR ~ dnorm(0, 1),
+    sigma ~ dunif(0, 10)
+  ),
+  data = d.A1
+)
+
+# non-African nations
+m7.2 <- map(
+  alist(
+    log_gdp ~ dnorm(mu, sigma),
+    mu <- a + bR * rugged,
+    a ~ dnorm(8, 100),
+    bR ~ dnorm(0, 1),
+    sigma ~ dunif(0, 10)
+  ),
+  data = d.A0
+)
+```
+
+```{r Figure 7.2}
+A1.seq <- seq(0, max(dd$rugged), length.out = 30)
+mu <- link(m7.1, data = data.frame(rugged = A1.seq), refresh = 0)
+mu.mean <- apply(mu, 2, mean)
+mu.PI <- apply(mu, 2, PI)
+
+
+plot(log_gdp ~ rugged, data = d.A1, col = rangi2)
+lines(A1.seq, mu.mean)
+shade(mu.PI, A1.seq)
+title("Africa")
+```
+
+
+```{r Figure 7.2 }
+A0.seq <- seq(0, max(dd$rugged), length.out = 30)
+mu <- link(m7.2, data = data.frame(rugged = A0.seq), refresh = 0)
+mu.mean <- apply(mu, 2, mean)
+mu.PI <- apply(mu, 2, PI)
+
+plot(log_gdp ~ rugged, data = d.A0, col = rangi2)
+lines(A0.seq, mu.mean)
+shade(mu.PI, A0.seq)
+```
+

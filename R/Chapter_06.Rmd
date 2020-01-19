@@ -1,0 +1,424 @@
+---
+title: "Chapter 6 - Overfitting, regularization and information criteria"
+output: html_notebook
+---
+
+# 6.1 The problem with parameters
+## 6.1.1 More parameters always improve fit
+```{r 6.1}
+sppnames <- c( "afarensis","africanus","habilis","boisei",
+    "rudolfensis","ergaster","sapiens")
+brainvolcc <- c( 438 , 452 , 612, 521, 752, 871, 1350 )
+masskg <- c( 37.0 , 35.5 , 34.5 , 41.5 , 55.5 , 61.0 , 53.5 )
+d <- data.frame( species=sppnames , brain=brainvolcc , mass=masskg )
+```
+
+```{r 6.2}
+m6.1 <- lm(brain ~ mass, data = d)
+
+1 - var(resid(m6.1))/var(d$brain)
+summary(m6.1)
+```
+
+```{r 6.4}
+m6.2 <- lm( brain ~ mass + I(mass^2) , data=d )
+
+m6.3 <- lm( brain ~ mass + I(mass^2) + I(mass^3) , data=d )
+m6.4 <- lm( brain ~ mass + I(mass^2) + I(mass^3) + I(mass^4) ,
+    data=d )
+m6.5 <- lm( brain ~ mass + I(mass^2) + I(mass^3) + I(mass^4) +
+    I(mass^5) , data=d )
+m6.6 <- lm( brain ~ mass + I(mass^2) + I(mass^3) + I(mass^4) +
+    I(mass^5) + I(mass^6) , data=d )
+```
+
+# 6.7 Pracitce
+Answers [here](https://rpubs.com/jmgirard/sr6)
+
+## Easy
+### 6E2
+```{r}
+p <- c(0.7, 1 - 0.7)
+-sum(p * log(p))
+```
+
+### 6E3
+```{r}
+p <- c(0.2, 0.25, 0.25, 0.3)
+-sum(p * log(p))
+```
+
+### 6E4
+```{r}
+p <- c(1/3, 1/3, 1/3)
+-sum(p * log(p))
+```
+
+## Medium
+### 6M1
+### 6M2
+### 6M3
+```{r}
+library(rethinking)
+data("Howell1")
+d <- Howell1[complete.cases(Howell1), ]
+d500 <- d[sample(1:nrow(d), 500, replace = FALSE),]
+d400 <- d[sample(1:nrow(d), 400, replace = FALSE),]
+d300 <- d[sample(1:nrow(d), 300, replace = FALSE), ]
+
+
+m500 <- map(
+  alist(
+    height ~ dnorm(mu, sigma),
+    mu <- a + b * log(weight)
+  ), 
+  data = d500,
+  start = list(a = mean(d500$height), b = 0, sigma = sd(d500$height))
+)
+
+m400 <- map(
+  alist(
+    height ~ dnorm(mu, sigma),
+    mu <- a + b * log(weight)
+  ),
+  data = d400,
+  start = list(a = mean(d400$height), b = 0, sigma = sd(d400$height))
+)
+
+m300 <- map(
+  alist(
+    height ~ dnorm(mu, sigma),
+    mu <- a + b * log(weight)
+  ),
+  data = d300,
+  start = list(a = mean(d300$height), b = 0, sigma = sd(d300$height))
+)
+
+
+(model.compare <- compare(m500, m400, m300))
+```
+
+## Hard
+```{r}
+library(rethinking)
+data("Howell1")
+d <- Howell1
+d$age <- (d$age - mean(d$age))/sd(d$age)
+RNGkind(sample.kind = "Rounding")
+set.seed(1000)
+i <- sample(1:nrow(d), size = nrow(d)/2)
+d1 <- d[i, ]
+d2 <- d[-i, ]
+```
+
+Fit the models to d1 using `map`
+```{r}
+m1 <- map(
+  alist(
+    height ~ dnorm(mu, sigma),
+    mu <- a + b1 * age,
+    a ~ dnorm(140, 30),
+    b1 ~ dnorm(0, 50),
+    sigma ~ dnorm(30, 10)
+  ),
+  data = d1
+)
+
+m2 <- map(
+  alist(
+    height ~ dnorm(mu, sigma),
+    mu <- a + b1 * age + b2 * I(age ^ 2),
+    a ~ dnorm(140, 30),
+    b1 ~ dnorm(0, 50),
+    b2 ~ dnorm(0, 50),
+    sigma ~ dnorm(30, 10)
+  ),
+  data = d1
+)
+
+m3 <- map(
+  alist(
+    height ~ dnorm(mu, sigma),
+    mu <- a + b1 * age + b2 * I(age ^ 2) + b3 * I(age ^ 3),
+    a ~ dnorm(140, 30),
+    b1 ~ dnorm(0, 50),
+    b2 ~ dnorm(0, 50),
+    b3 ~ dnorm(0, 50),
+    sigma ~ dnorm(30, 10)
+  ),
+  data = d1
+)
+
+m4 <- map(
+  alist(
+    height ~ dnorm(mu, sigma),
+    mu <- a + b1 * age + b2 * I(age ^ 2) + b3 * I(age ^ 3) + b4 * I(age ^ 4),
+    a ~ dnorm(140, 30),
+    b1 ~ dnorm(0, 50),
+    b2 ~ dnorm(0, 50),
+    b3 ~ dnorm(0, 50),
+    b4 ~ dnorm(0, 50),
+    sigma ~ dnorm(30, 10)
+  ),
+  data = d1
+)
+
+m5 <- map(
+  alist(
+    height ~ dnorm(mu, sigma),
+    mu <- a + b1 * age + b2 * I(age ^ 2) + b3 * I(age ^ 3) + b4 * I(age ^ 4) + b5 * I(age ^ 5),
+    a ~ dnorm(140, 30),
+    b1 ~ dnorm(0, 50),
+    b2 ~ dnorm(0, 50),
+    b3 ~ dnorm(0, 50),
+    b4 ~ dnorm(0, 50),
+    b5 ~ dnorm(0, 50),
+    sigma ~ dnorm(30, 10)
+  ),
+  data = d1
+)
+
+m6 <- map(
+  alist(
+    height ~ dnorm(mu, sigma),
+    mu <- a + b1 * age + b2 * I(age ^ 2) + b3 * I(age ^ 3) + b4 * I(age ^ 4) + b5 * I(age ^5) + b6 * I(age ^ 6),
+    a ~ dnorm(140, 30),
+    b1 ~ dnorm(0, 50),
+    b2 ~ dnorm(0, 50),
+    b3 ~ dnorm(0, 50),
+    b4 ~ dnorm(0, 50),
+    b5 ~ dnorm(0, 50),
+    b6 ~ dnorm(0, 50),
+    sigma ~ dnorm(30, 10)
+  ),
+  data = d1
+)
+
+
+```
+
+### 6H1
+```{r}
+compare(m1, m2, m3, m4, m5, m6, refresh = 0)
+```
+
+### 6H2
+Get predictions data ready:
+```{r}
+age.seq <- seq(from = -2.0, to = 4.0, length.out = 30)
+d.predict <- list(
+  height = rep(0, 30),
+  age = age.seq
+)
+
+```
+
+Make a function to plot the data:
+```{r}
+age_plot <- function(m, d1, d.predict) {
+  pred <- link(m, data = d.predict, refresh = 0)
+  mu <- apply(pred, 2, mean)
+  mu.PI <- apply(pred, 2, PI, prob = 0.97)
+  plot(height ~ age, d1, col = rangi2)
+  lines(d.predict$age, mu)
+  shade(mu.PI, d.predict$age)
+}
+```
+
+```{r}
+age_plot(m1, d1, d.predict = d.predict)
+```
+
+```{r}
+age_plot(m2, d1, d.predict)
+```
+
+```{r}
+age_plot(m3, d1, d.predict)
+```
+
+```{r}
+age_plot(m4, d1, d.predict)
+```
+
+```{r}
+age_plot(m5, d1, d.predict)
+```
+
+```{r}
+age_plot(m6, d1, d.predict)
+```
+
+### 6H3
+```{r}
+# Plot the lowest WAIC model with dashed lines
+pred.m4 <- link(m4, data = d.predict, refresh = 0)
+mu <- apply(pred.m4, 2, mean)
+mu.PI <- apply(pred.m4, 2, PI, prob = 0.97)
+plot(height ~ age, d1, col = rangi2)
+lines(age.seq, mu, lty = 2)
+```
+
+```{r}
+plot(height ~ age, d1, col = rangi2)
+lines(age.seq, mu, lty = 2)
+lines(age.seq, mu.PI[1,], lty = 2)
+lines(age.seq, mu.PI[2,], lty = 2)
+```
+
+Calculate and plot model averaged predictions
+```{r}
+height.ensemble <- ensemble(m1, m2, m3, m4, m5, m6, 
+                            data = d.predict, refresh = 0)
+```
+
+```{r}
+plot(height ~ age, d1, col = rangi2)
+lines(age.seq, mu, lty = 2)
+lines(age.seq, mu.PI[1,], lty = 2)
+lines(age.seq, mu.PI[2,], lty = 2)
+mu <- apply(height.ensemble$link, 2, mean)
+mu.PI <- apply(height.ensemble$link, 2, PI, prob = 0.97)
+lines(age.seq, mu)
+shade(mu.PI, age.seq)
+```
+
+### 6H4
+```{r m1}
+theta <- coef(m1)
+(m1.d <- -2 * sum(
+  dnorm(
+    x = d2$height,
+    mean = theta[1] + theta[2] * d2$age,
+    sd = theta[3],
+    log = TRUE
+  )
+))
+
+```
+
+```{r m2}
+theta <- coef(m2)
+(m2.d <- -2 * sum(
+  dnorm(
+    x = d2$height,
+    mean = theta[1] + theta[2] * d2$age + theta[3] * d2$age ^ 2,
+    sd = theta[4],
+    log = TRUE
+  )
+))
+
+```
+
+```{r m3}
+theta <- coef(m3)
+(m3.d <- -2 * sum(
+  dnorm(
+    x = d2$height,
+    mean = theta[1] + theta[2] * d2$age + theta[3] * d2$age ^ 2 + theta[4] * d2$age ^ 3,
+    sd = theta[5],
+    log = TRUE
+  )
+))
+
+```
+
+```{r m4}
+theta <- coef(m4)
+(m4.d <- -2 * sum(
+  dnorm(
+    x = d2$height,
+    mean = theta[1] + theta[2] * d2$age + theta[3] * d2$age ^ 2 + theta[4] * d2$age ^ 3 + theta[5] * d2$age ^4,
+    sd = theta[6],
+    log = TRUE
+  )
+))
+
+```
+
+```{r m5}
+theta <- coef(m5)
+(m5.d <- -2 * sum(
+  dnorm(
+    x = d2$height, 
+    mean = theta[1] + theta[2]*d2$age + theta[3]*d2$age^2 + theta[4]*d2$age^3 + theta[5]*d2$age^4 +
+      theta[6]*d2$age^5,
+    sd = theta[7],
+    log = TRUE
+  )
+))
+```
+
+```{r m6}
+theta <- coef(m6)
+(m6.d <- -2 * sum(
+  dnorm(
+    x = d2$height, 
+    mean = theta[1] + theta[2]*d2$age + theta[3]*d2$age^2 + theta[4]*d2$age^3 + theta[5]*d2$age^4 +
+      theta[6]*d2$age^5 + theta[7]*d2$age^6,
+    sd = theta[8],
+    log = TRUE
+  )
+))
+```
+
+### 6H5
+```{r}
+model.stats <- data.frame(
+  model = c("m1", "m2", "m3", "m4", "m5", "m6"),
+  WAIC = c(WAIC(m1, refresh = 0),
+            WAIC(m2, refresh = 0),
+            WAIC(m3, refresh = 0),
+            WAIC(m4, refresh = 0),
+            WAIC(m5, refresh = 0),
+            WAIC(m6, refresh = 0)),
+  deviance = c(m1.d, m2.d, m3.d, m4.d, m5.d, m6.d)
+)
+model.stats$deviance.c <- model.stats$deviance - min(model.stats$deviance)
+model.stats$WAI.c <- model.stats$WAIC - min(model.stats$WAIC)
+
+model.stats
+```
+
+### 6H6
+```{r}
+m <- map(
+  alist(
+    height ~ dnorm(mu, sigma),
+    mu <- a + b1 * age + b2 * age^2 + b3 * age^3 + b4 * age^4 + b5 * age^5 + b6 * age^6,
+    a ~ dunif(50, 200),
+    b1 ~ dnorm(0, 5),
+    b2 ~ dnorm(0, 5),
+    b3 ~ dnorm(0, 5),
+    b4 ~ dnorm(0, 5),
+    b5 ~ dnorm(0, 5),
+    b6 ~ dnorm(0, 5),
+    sigma ~ dunif(0, 100)
+  ), 
+  data = d1
+)
+
+precis(m)
+```
+
+```{r}
+age_plot(m, d1, d.predict = d.predict)
+```
+
+```{r}
+theta <- coef(m)
+(m.d <- -2 * sum(
+  dnorm(
+    x = d2$height, 
+    mean = theta[1] + theta[2]*d2$age + theta[3]*d2$age^2 + theta[4]*d2$age^3 + theta[5]*d2$age^4 +
+      theta[6]*d2$age^5 + theta[7]*d2$age^6,
+    sd = theta[8],
+    log = TRUE
+  )
+))
+```
+
+```{r}
+m.d - m4.d
+```
+
