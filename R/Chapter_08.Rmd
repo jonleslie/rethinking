@@ -83,7 +83,7 @@ m8.1stan <- map2stan(
 ```
 
 
-```{r}
+```{r 8.6}
 precis(m8.1stan)
 
 ```
@@ -116,9 +116,10 @@ plot(m8.1stan, window = c(80, 2000))
 # plot(m8.1stan)
 ```
 
-```{r 8.13}
+```{r}
 stancode(m8.1stan)
 ```
 
 # 8.4 Care and feeding of your Markov chain
 ## 8.4.1 How many samples do you need?
+
