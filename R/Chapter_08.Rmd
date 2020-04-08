@@ -1,6 +1,9 @@
 ---
-title: "Chapter 8: Markov Chain Monte Carlo"
-output: html_notebook
+title: 'Chapter 8: Markov Chain Monte Carlo'
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
 ---
 
 # 8.1 Good King Markov and His island kingdom
@@ -122,4 +125,580 @@ stancode(m8.1stan)
 
 # 8.4 Care and feeding of your Markov chain
 ## 8.4.1 How many samples do you need?
+## 8.4.3 Taming a wild chain
+```{r 8.13}
+y <- c(-1,1)
+m8.2 <- map2stan(
+  alist(
+    y ~ dnorm(mu, sigma),
+    mu <- alpha
+  ),
+  data = list(y=y),
+  start = list(alpha=0, sigma = 1),
+  chains = 2, iter = 4000, warmup = 1000
+)
+```
+
+```{r 8.14}
+precis(m8.2)
+```
+
+```{r}
+plot(m8.2)
+```
+
+
+```{r, 8.15}
+m8.3 <- map2stan(
+  alist(
+    y ~ dnorm(mu, sigma),
+    mu <- alpha,
+    alpha ~ dnorm(1, 10),
+    sigma ~ dcauchy(0, 1)
+  ),
+  data = list(y = y),
+  start = list(alpha = 0, sigma = 1),
+  chains = 2, iter = 4000, warmup = 1000
+)
+precis(m8.3)
+```
+
+```{r}
+plot(m8.3)
+```
+
+```{r 8.16}
+y <- rcauchy(1e4, 0, 5)
+mu <- sapply(1:length(y), function(i) sum(y[1:i])/i)
+plot(mu, type = "l")
+```
+
+## 8.4.4 Non-identifiable parameters
+```{r 8.17}
+y <- rnorm(100, mean = 0, sd = 1)
+```
+
+```{r 8.18}
+m8.4 <- map2stan(
+  alist(
+    y ~ dnorm(mu, sigma),
+    mu <- a1 + a2,
+    sigma ~ dcauchy(0, 1)
+  ),
+  data = list(y = y), start = list(a1 = 0, a2 = 0, sigma = 1),
+  chains = 2, iter = 4000, warmup = 1000)
+precis(m8.4)
+```
+
+```{r}
+plot(m8.4)
+```
+
+
+```{r 8.19}
+m8.5 <- map2stan(
+    alist(
+        y ~ dnorm( mu , sigma ) ,
+        mu <- a1 + a2 ,
+        a1 ~ dnorm( 0 , 10 ) ,
+        a2 ~ dnorm( 0 , 10 ) ,
+        sigma ~ dcauchy( 0 , 1 )
+    ) ,
+    data=list(y=y) , start=list(a1=0,a2=0,sigma=1) ,
+    chains=2 , iter=4000 , warmup=1000 )
+precis(m8.5)
+```
+
+
+```{r }
+plot(m8.5)
+```
+
+# 8.6 Practice
+Solutions from [here](https://raw.githubusercontent.com/jffist/statistical-rethinking-solutions/master/ch08_hw.R) and [here](https://github.com/cavaunpeu/statistical-rethinking/blob/master/chapter-8/homework.R)
+
+## Medium
+### 8M1
+```{r}
+data(rugged)
+d <- rugged
+d$log_gdp <- log(d$rgdppc_2000)
+dd <- d[ complete.cases(d$rgdppc_2000) , ]
+dd.trim <- dd[ , c("log_gdp","rugged","cont_africa") ]
+
+m8m1.ch <- map2stan( 
+  alist(
+    log_gdp ~ dnorm( mu , sigma ) ,
+    mu <- a + bR*rugged + bA*cont_africa + bAR*rugged*cont_africa ,
+    a ~ dnorm(0,100),
+    bR ~ dnorm(0,10),
+    bA ~ dnorm(0,10),
+    bAR ~ dnorm(0,10),
+    sigma ~ dcauchy(0,2)
+  ) ,
+  data=dd.trim )
+precis(m8m1.ch)
+pairs(m8m1.ch)
+```
+
+```{r}
+m8.m1.un <- map2stan( 
+  alist(
+    log_gdp ~ dnorm( mu , sigma ) ,
+    mu <- a + bR*rugged + bA*cont_africa + bAR*rugged*cont_africa ,
+    a ~ dnorm(0,100),
+    bR ~ dnorm(0,10),
+    bA ~ dnorm(0,10),
+    bAR ~ dnorm(0,10),
+    sigma ~ dunif(0,10)
+  ) ,
+  data=dd.trim )
+precis(m8.m1.un)
+pairs(m8.m1.un)
+```
+
+```{r}
+m8.m1.exp <- map2stan( 
+  alist(
+    log_gdp ~ dnorm( mu , sigma ) ,
+    mu <- a + bR*rugged + bA*cont_africa + bAR*rugged*cont_africa ,
+    a ~ dnorm(0,100),
+    bR ~ dnorm(0,10),
+    bA ~ dnorm(0,10),
+    bAR ~ dnorm(0,10),
+    sigma ~ dexp(1)
+  ) ,
+  data=dd.trim )
+precis(m8.m1.exp)
+pairs(m8.m1.exp)
+```
+
+```{r}
+# plot sigma densities
+sigma.ch <- extract.samples( m8m1.ch)$sigma
+sigma.un <- extract.samples( m8.m1.un)$sigma
+sigma.ex <- extract.samples( m8.m1.exp)$sigma
+
+par(mfrow=c(1,1))
+dens(sigma.ch, xlim=c(0.7, 1.2), col='red')
+dens(sigma.un, add=T, col='blue')
+dens(sigma.ex, add=T)
+
+```
+
+I can't tell any difference.
+
+### 8M2
+```{r}
+# fit models with a cauchy prior on sigma for varying scale parameter values
+m8.2.cauchy.10 <- map2stan(
+  alist(
+    log_gdp ~ dnorm( mu , sigma ) ,
+    mu <- a + bR*rugged + bA*cont_africa + bAR*rugged*cont_africa ,
+    a ~ dnorm(0, 100),
+    bR ~ dnorm(0, 10),
+    bA ~ dnorm(0, 10),
+    bAR ~ dnorm(0, 10),
+    sigma ~ dcauchy(0, 10)
+  ), data=dd.trim )
+```
+
+``` {r}
+m8.2.cauchy.1 <- map2stan(
+  alist(
+    log_gdp ~ dnorm( mu , sigma ) ,
+    mu <- a + bR*rugged + bA*cont_africa + bAR*rugged*cont_africa ,
+    a ~ dnorm(0, 100),
+    bR ~ dnorm(0, 10),
+    bA ~ dnorm(0, 10),
+    bAR ~ dnorm(0, 10),
+    sigma ~ dcauchy(0, 1)
+  ), data=dd.trim )
+```
+```{r}
+m8.2.cauchy.point.1 <- map2stan(
+  alist(
+    log_gdp ~ dnorm( mu , sigma ) ,
+    mu <- a + bR*rugged + bA*cont_africa + bAR*rugged*cont_africa ,
+    a ~ dnorm(0, 100),
+    bR ~ dnorm(0, 10),
+    bA ~ dnorm(0, 10),
+    bAR ~ dnorm(0, 10),
+    sigma ~ dcauchy(0, .1)
+  ), data=dd.trim )
+
+```
+```{r}
+# fit models with an exponential prior on sigma for varying scale parameter values
+m8.2.exp.10 <- map2stan(
+  alist(
+    log_gdp ~ dnorm( mu , sigma ) ,
+    mu <- a + bR*rugged + bA*cont_africa + bAR*rugged*cont_africa ,
+    a ~ dnorm(0, 100),
+    bR ~ dnorm(0, 10),
+    bA ~ dnorm(0, 10),
+    bAR ~ dnorm(0, 10),
+    sigma ~ dexp(10)
+  ), data=dd.trim )
+
+m8.2.exp.1 <- map2stan(
+  alist(
+    log_gdp ~ dnorm( mu , sigma ) ,
+    mu <- a + bR*rugged + bA*cont_africa + bAR*rugged*cont_africa ,
+    a ~ dnorm(0, 100),
+    bR ~ dnorm(0, 10),
+    bA ~ dnorm(0, 10),
+    bAR ~ dnorm(0, 10),
+    sigma ~ dexp(1)
+  ), data=dd.trim )
+
+m8.2.exp.point.1 <- map2stan(
+  alist(
+    log_gdp ~ dnorm( mu , sigma ) ,
+    mu <- a + bR*rugged + bA*cont_africa + bAR*rugged*cont_africa ,
+    a ~ dnorm(0, 100),
+    bR ~ dnorm(0, 10),
+    bA ~ dnorm(0, 10),
+    bAR ~ dnorm(0, 10),
+    sigma ~ dexp(.1)
+  ), data=dd.trim )
+
+# plot the posterior distribution for sigma under the cauchy priors
+sigma.cauchy.10 <- extract.samples(m8.2.cauchy.10, pars="sigma")
+sigma.cauchy.1 <- extract.samples(m8.2.cauchy.1, pars="sigma")
+sigma.cauchy.point.1 <- extract.samples(m8.2.cauchy.point.1, pars="sigma")
+dens(sigma.cauchy.10[[1]], xlab="sigma", col="red")
+dens(sigma.cauchy.1[[1]], add=TRUE, col="blue")
+dens(sigma.cauchy.point.1[[1]], add=TRUE, col="green")
+
+# plot the posterior distribution for sigma under the exponential priors
+sigma.exp.10 <- extract.samples(m8.2.exp.10, pars="sigma")
+sigma.exp.1 <- extract.samples(m8.2.exp.1, pars="sigma")
+sigma.exp.point.1 <- extract.samples(m8.2.exp.point.1, pars="sigma")
+dens(sigma.exp.10[[1]], xlab="sigma", col="red")
+dens(sigma.exp.1[[1]], add=TRUE, col="blue")
+dens(sigma.exp.point.1[[1]], add=TRUE, col="green")
+
+```
+
+### 8M3
+```{r}
+# estimate the terrain ruggedness model with varying values for warmup
+m <- map2stan(
+  alist(
+    log_gdp ~ dnorm( mu , sigma ) ,
+    mu <- a + bR*rugged + bA*cont_africa + bAR*rugged*cont_africa ,
+    a ~ dnorm(0,100),
+    bR ~ dnorm(0,10),
+    bA ~ dnorm(0,10),
+    bAR ~ dnorm(0,10),
+    sigma ~ dcauchy(0,2)
+  ), data=dd.trim )
+
+m.warmup.1 <- map2stan(m, chains = 4, cores = 4, warmup = 1, iter = 1000)
+m.warmup.5 <- map2stan(m, chains = 4, cores = 4, warmup = 5, iter = 1000)
+m.warmup.10 <- map2stan(m, chains = 4, cores = 4, warmup = 10, iter = 1000)
+m.warmup.50 <- map2stan(m, chains = 4, cores = 4, warmup = 50, iter = 1000)
+m.warmup.100 <- map2stan(m, chains = 4, cores = 4, warmup = 100, iter = 1000)
+m.warmup.500 <- map2stan(m, chains = 4, cores = 4, warmup = 500, iter = 1000)
+m.warmup.1000 <- map2stan(m, chains = 4, cores = 4, warmup = 1000, iter = 1000)
+
+precis(m.warmup.1)
+precis(m.warmup.5)
+precis(m.warmup.10)
+precis(m.warmup.50)
+precis(m.warmup.100)
+precis(m.warmup.500)
+precis(m.warmup.1000)
+```
+
+Alternative approach:
+```{r}
+formula8m3 <- alist(
+    log_gdp ~ dnorm( mu , sigma ) ,
+    mu <- a + bR*rugged + bA*cont_africa + bAR*rugged*cont_africa ,
+    a ~ dnorm(0,100),
+    bR ~ dnorm(0,10),
+    bA ~ dnorm(0,10),
+    bAR ~ dnorm(0,10),
+    sigma ~ dcauchy(0,2)
+  ) 
+
+m8m3.w1 <- map2stan(formula8m3, data=dd.trim, iter=1001, warmup=1)
+precis(m8m3.w1)#awfull results, n_eff=1
+
+m8m3.w10 <- map2stan(formula8m3, data=dd.trim, iter=1010, warmup=10)
+precis(m8m3.w10)#not so awfull results, n_eff=~100..200, troubles with estimates bA & sigma
+plot(m8m3.w10)
+
+m8m3.w100 <- map2stan(formula8m3, data=dd.trim, iter=1100, warmup=100)
+precis(m8m3.w100)#enough of warmup
+plot(m8m3.w100)
+
+m8m3.w500 <- map2stan(formula8m3, data=dd.trim, iter=1500, warmup=500)
+precis(m8m3.w500)#"wasted" warmup
+plot(m8m3.w500)
+
+m8m3.w1k <- map2stan(formula8m3, data=dd.trim, iter=2000, warmup=1000)
+precis(m8m3.w1k)#"wasted" warmup
+plot(m8m3.w1k)
+```
+
+## Hard
+### 8H1
+```{r 8.20}
+mp <- map2stan(
+  alist(
+    a ~ dnorm(0, 1),
+    b ~ dcauchy(0, 1)
+  ),
+  data = list(y = 1),
+  start = list(a = 0, b = 0),
+  iter = 1e4, warmup = 100, WAIC = FALSE
+)
+```
+
+```{r}
+plot(mp)
+```
+
+```{r}
+precis(mp)
+pairs(mp)
+```
+
+```{r}
+samples <- extract.samples(mp)
+hist(samples$a)
+hist(samples$b)
+```
+
+### 2H2
+```{r}
+library(dplyr)
+
+data(WaffleDivorce)
+d <- WaffleDivorce
+
+normalise <- function(x){
+  (x-mean(x))/sd(x)
+}
+
+d$MedianAgeMarriage_s <- normalise(d$MedianAgeMarriage)
+d$Marriage_s <- normalise(d$Marriage)
+
+```
+
+```{r}
+m5.1 <- map2stan(
+  alist(
+    Divorce ~ dnorm( mu , sigma ) ,
+    mu <- a + bA * MedianAgeMarriage_s ,
+    a ~ dnorm( 10 , 10 ) ,
+    bA ~ dnorm( 0 , 1 ) ,
+    sigma ~ dcauchy(0 , 2)
+  ), 
+  data = select(d, Divorce, MedianAgeMarriage_s) )
+precis(m5.1)
+plot(m5.1)
+pairs(m5.1)
+```
+
+```{r}
+m5.2 <- map2stan(
+  alist(
+    Divorce ~ dnorm( mu , sigma ) ,
+    mu <- a + bR * Marriage_s ,
+    a ~ dnorm( 10 , 10 ) ,
+    bR ~ dnorm( 0 , 1 ) ,
+    sigma ~ dcauchy( 0 , 2 )
+  ) , data = select(d, Divorce, Marriage_s) )
+precis(m5.2)
+plot(m5.2)
+pairs(m5.2)
+```
+
+```{r}
+m5.3 <- map2stan( 
+             alist(
+               Divorce ~ dnorm( mu , sigma ) ,
+               mu <- a + bR*Marriage_s + bA*MedianAgeMarriage_s ,
+               a ~ dnorm( 10 , 10 ) ,
+               bR ~ dnorm( 0 , 1 ) ,
+               bA ~ dnorm( 0 , 1 ) ,
+               sigma ~ dcauchy( 0 , 2)
+             ) ,
+             data = select(d, Divorce, MedianAgeMarriage_s, Marriage_s)
+             )
+precis(m5.3)
+plot(m5.3)
+pairs(m5.3)
+```
+
+```{r}
+coeftab(m5.1, m5.2, m5.3)
+compare(m5.1, m5.2, m5.3)
+
+```
+
+### 8H3
+```{r 8.21}
+## R code 8.21
+N <- 100                          # number of individuals
+height <- rnorm(N,10,2)           # sim total height of each
+leg_prop <- runif(N,0.4,0.5)      # leg as proportion of height
+leg_left <- leg_prop*height +     # sim left leg as proportion + error
+    rnorm( N , 0 , 0.02 )
+leg_right <- leg_prop*height +    # sim right leg as proportion + error
+    rnorm( N , 0 , 0.02 )
+                                  # combine into data frame
+d <- data.frame(height,leg_left,leg_right)
+
+```
+
+```{r 8.22}
+m5.8s <- map2stan(
+    alist(
+        height ~ dnorm( mu , sigma ) ,
+        mu <- a + bl*leg_left + br*leg_right ,
+        a ~ dnorm( 10 , 100 ) ,
+        bl ~ dnorm( 2 , 10 ) ,
+        br ~ dnorm( 2 , 10 ) ,
+        sigma ~ dcauchy( 0 , 1 )
+    ) ,
+    data=d, chains=4,
+    start=list(a=10,bl=0,br=0,sigma=1) )
+
+```
+
+```{r 8.23}
+m5.8s2 <- map2stan(
+    alist(
+        height ~ dnorm( mu , sigma ) ,
+        mu <- a + bl*leg_left + br*leg_right ,
+        a ~ dnorm( 10 , 100 ) ,
+        bl ~ dnorm( 2 , 10 ) ,
+        br ~ dnorm( 2 , 10 ) & T[0,] ,
+        sigma ~ dcauchy( 0 , 1 )
+    ) ,
+    data=d, chains=4,
+    start=list(a=10,bl=0,br=0,sigma=1) )
+
+```
+
+```{r}
+precis(m5.8s)
+pairs(m5.8s)
+```
+
+```{r}
+precis(m5.8s2)
+pairs(m5.8s2)
+```
+
+```{r}
+compare(m5.8s, m5.8s2)
+```
+
+### 8H4
+```{r}
+# using models from 8H3
+WAIC(m5.8s)  # pWAIC = 3.2937
+WAIC(m5.8s2) # pWAIC = 2.819
+# Effective number of parameters for the second model is smaller. 
+# Intuitively it is smaller because we restricted "freedom" of the 'br' coefficient. This parameter couldn't be negative for the second model, while the probability of having big values is still very small as for the first model. Thus overall freedom of the model declined.
+# More formally, pWAIC is defined as sum of variance of the points likelihood, thus the second model has smaller variance of data likelihood(==> it's 'more restricted')
+
+#same story with effective numbet of parameters for DIC
+DIC(m5.8s) # pD=3.9
+DIC(m5.8s2) # pD=3.4
+
+```
+
+### 8H5
+```{r}
+population <- c(10, 60, 20, 100, 30)
+n_islands <- length(population)
+n_trials <- 1e+5
+positions <- rep(0, n_trials)
+curr_pos <- 1
+for(i in 1:n_trials){
+  positions[i] <- curr_pos
+  next_pos <- ifelse(runif(1)<0.5, -1, 1) + curr_pos
+  if (next_pos <= 0){
+    next_pos <- n_islands
+  } else if (next_pos > n_islands){
+    next_pos <- 1
+  }
+  p_ratio <- population[next_pos] / population[curr_pos]
+  if ( runif(1) < p_ratio ){
+    curr_pos <- next_pos
+  }
+}
+hist(positions)
+table(positions)/n_trials
+population/sum(population)
+
+
+```
+
+### 8H6
+```{r}
+# data: number of 'water' tosses out of N total tosses
+n_water = 9
+n_tosses = 10
+# priors: 
+#    - flat prios -> just a constant  P_prior(p) = some_c
+get_prior_prob <- function(p){
+  #1 #flat
+  dcauchy(p, 0.5, .1)
+}
+
+n_trials <- 1e+5 #number of steps of MCMC
+param.samples <- rep(0, n_trials)
+curr_param <- 0.01
+curr_prob <- dbinom(n_water, n_tosses, prob = curr_param) * get_prior_prob(curr_param)
+param_delta <- 0.01 #step for the parameter - equivalent of a jump to the next island
+for(i in 1:n_trials){
+  param.samples[i] <- curr_param
+  next_param <- ifelse(runif(1)<0.5, -1, 1)*param_delta + curr_param #symetric move
+  if (next_param <= 0){
+    next_param <- 0
+  } else if (next_param >= 1){
+    next_param <- 1
+  }
+  next_prob <- dbinom(n_water, n_tosses, prob = next_param) * get_prior_prob(next_param)
+  p_ratio <- next_prob / curr_prob
+  if ( runif(1) < p_ratio ){
+    curr_param <- next_param
+    curr_prob <- next_prob
+  }
+}
+par(mfrow=c(1,1))
+hist(param.samples)
+abline(v=n_water/n_tosses, col='red', lty=2, xlim=c(0,1))
+plot(param.samples[1:1000], type='l')
+plot(param.samples, type='l', ylim=c(0,1))
+abline(h=n_water/n_tosses, col='red', lty=2)
+
+
+## grid approximation
+#get_prior_prob <- function(p){
+#  #1 #flat
+#  dcauchy(p, 0.5, .1)
+#}
+#param_delta <- 0.01
+p.grid <- seq(0,1,by=param_delta)
+prior <- get_prior_prob(p.grid)
+likelihood <- sapply(p.grid, function(x) dbinom(n_water, n_tosses, prob=x))
+posterior <- prior * likelihood
+posterior <- posterior / sum(posterior)
+par(mfrow=c(3,1))
+plot(p.grid, prior, type='l', lty=2)
+plot(p.grid, likelihood, type='l', lty=3, col='red')
+abline(v=n_water/n_tosses)
+plot(p.grid, posterior, type='l', col='blue')
+abline(v=p.grid[which.max(posterior)])
+print(p.grid[which.max(posterior)])
+```
 
