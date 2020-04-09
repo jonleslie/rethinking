@@ -6,6 +6,7 @@ output: html_document
 # 9.1 Maximum entropy
 
 ```{r 9.1}
+library(rethinking)
 p <- list()
 p$A <- c(0, 0, 10, 0, 0)
 p$B <- c(0, 1, 8, 1, 0)
@@ -32,4 +33,64 @@ logwayspp <- log(ways)/10
 ```{r}
 plot(logwayspp, H)
 ```
+
+```{r 9.5}
+# build a list of the candidate distributions
+p <- list()
+p[[1]] <- c(1/4, 1/4, 1/4, 1/4)
+p[[2]] <- c(2/6, 1/6, 1/6, 2/6)
+p[[3]] <- c(1/6, 2/6, 2/6, 1/6)
+p[[4]] <- c(1/8, 4/8, 2/8, 1/8)
+
+# compute expected value of each
+sapply(p, function(p) sum(p*c(0, 1, 1, 2)))
+```
+
+```{r 9.6}
+sapply(p, function(p) -sum(p * log(p)))
+```
+
+```{r 9.7}
+p <- 0.7
+(A <- c((1-p)^2, p*(1-p), (1-p)*p, p^2))
+```
+
+```{r 9.8}
+-sum(A * log(A))
+```
+
+```{r 9.9}
+sim.p <- function(G=1.4) {
+  x123 <- runif(3)
+  x4 <- ( (G) * sum(x123) - x123[2] - x123[3])/(2 - G)
+  z <- sum(c(x123, x4))
+  p <- c(x123, x4)/z
+  list(H = -sum(p * log(p)), p = p)
+}
+```
+
+```{r 9.10}
+H <- replicate(1e5, sim.p(1.4))
+dens(as.numeric(H[1,]), adj = 0.1)
+```
+
+```{r 9.11}
+entropies <- as.numeric(H[1,])
+distributions <- H[2,]
+```
+
+```{r 9.12}
+max(entropies)
+```
+
+```{r 9.13}
+distributions[which.max(entropies)]
+```
+
+```{r}
+H[1, 1:10]
+H[2, 1:10]
+```
+
+
 
